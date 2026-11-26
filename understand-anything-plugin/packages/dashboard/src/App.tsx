@@ -1,9 +1,11 @@
 import { useEffect, useState, useMemo, useCallback, lazy, Suspense } from "react";
-import { validateGraph } from "@understand-anything/core/schema";
+import { validateGraph, validateOpGraph } from "@understand-anything/core/schema";
 import type { GraphIssue } from "@understand-anything/core/schema";
 import { useDashboardStore } from "./store";
 import GraphView from "./components/GraphView";
 import DomainGraphView from "./components/DomainGraphView";
+import OpGraphView from "./components/OpGraphView";
+import OpNodeInfo from "./components/OpNodeInfo";
 import KnowledgeGraphView from "./components/KnowledgeGraphView";
 import SearchBar from "./components/SearchBar";
 import NodeInfo from "./components/NodeInfo";
@@ -59,6 +61,7 @@ function dataUrl(fileName: string, token: string | null): string {
     const envMap: Record<string, string | undefined> = {
       "knowledge-graph.json": import.meta.env.VITE_GRAPH_URL,
       "domain-graph.json": import.meta.env.VITE_DOMAIN_GRAPH_URL,
+      "op-graph.json": import.meta.env.VITE_OP_GRAPH_URL,
       "meta.json": import.meta.env.VITE_META_URL,
       "diff-overlay.json": import.meta.env.VITE_DIFF_OVERLAY_URL,
       "config.json": import.meta.env.VITE_CONFIG_URL,
@@ -118,6 +121,7 @@ function App() {
 function Dashboard({ accessToken }: { accessToken: string }) {
   const setGraph = useDashboardStore((s) => s.setGraph);
   const setDomainGraph = useDashboardStore((s) => s.setDomainGraph);
+  const setOpGraph = useDashboardStore((s) => s.setOpGraph);
   const setDiffOverlay = useDashboardStore((s) => s.setDiffOverlay);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [graphIssues, setGraphIssues] = useState<GraphIssue[]>([]);
@@ -257,6 +261,27 @@ function Dashboard({ accessToken }: { accessToken: string }) {
       .catch(() => {});
   }, [setDomainGraph]);
 
+  useEffect(() => {
+    fetch(dataUrl("op-graph.json", accessToken))
+      .then((res) => {
+        if (!res.ok) return null;
+        return res.json();
+      })
+      .then((data: unknown) => {
+        if (!data) return;
+        const result = validateOpGraph(data);
+        if (result.success && result.data) {
+          setOpGraph(result.data);
+          for (const issue of result.issues) {
+            if (issue.level === "dropped") console.warn(`[op-graph] dropped: ${issue.message}`);
+          }
+        } else if (result.fatal) {
+          console.warn(`[op-graph] validation failed: ${result.fatal}`);
+        }
+      })
+      .catch(() => {});
+  }, [setOpGraph]);
+
   return (
     <I18nProvider language={outputLanguage ?? "en"}>
       <ThemeProvider metaTheme={metaTheme}>
@@ -311,6 +336,7 @@ function DashboardContent({
   const setViewMode = useDashboardStore((s) => s.setViewMode);
   const isKnowledgeGraph = useDashboardStore((s) => s.isKnowledgeGraph);
   const domainGraph = useDashboardStore((s) => s.domainGraph);
+  const opGraph = useDashboardStore((s) => s.opGraph);
   const layoutIssues = useDashboardStore((s) => s.layoutIssues);
   const isMobile = useIsMobile();
   const { t } = useI18n();
@@ -447,13 +473,17 @@ function DashboardContent({
   const isLearnMode = tourActive || persona === "junior";
   const infoSidebarContent = (
     <>
-      {selectedNodeId && <NodeInfo />}
-      {isLearnMode && (
+      {viewMode === "ops" && opGraph ? (
+        <OpNodeInfo />
+      ) : (
+        selectedNodeId && <NodeInfo />
+      )}
+      {viewMode !== "ops" && isLearnMode && (
         <Suspense fallback={null}>
           <LearnPanel />
         </Suspense>
       )}
-      {!selectedNodeId && !isLearnMode && <ProjectOverview />}
+      {viewMode !== "ops" && !selectedNodeId && !isLearnMode && <ProjectOverview />}
     </>
   );
 
@@ -506,10 +536,11 @@ function DashboardContent({
           </h1>
           <div className="w-px h-5 bg-border-subtle hidden sm:block" />
           <PersonaSelector />
-          {graph && !isKnowledgeGraph && domainGraph && (
+          {graph && !isKnowledgeGraph && (domainGraph || opGraph) && (
             <>
               <div className="w-px h-5 bg-border-subtle" />
               <div className="flex items-center bg-elevated rounded-lg p-0.5">
+                {domainGraph && (
                 <button
                   type="button"
                   onClick={() => setViewMode("domain")}
@@ -522,6 +553,7 @@ function DashboardContent({
                 >
                   {t.drawer.domain}
                 </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setViewMode("structural")}
@@ -534,6 +566,20 @@ function DashboardContent({
                 >
                   {t.drawer.structural}
                 </button>
+                {opGraph && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("ops")}
+                    title={t.opView.title}
+                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                      viewMode === "ops"
+                        ? "bg-accent/20 text-accent"
+                        : "text-text-muted hover:text-text-secondary"
+                    }`}
+                  >
+                    {t.drawer.ops}
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -544,7 +590,7 @@ function DashboardContent({
           <div className="flex items-center gap-4 w-max">
             <DiffToggle />
             {/* Detail level: file view (architecture) / class view (code structure) */}
-            {!isKnowledgeGraph && viewMode !== "domain" && (
+            {!isKnowledgeGraph && viewMode !== "domain" && viewMode !== "ops" && (
               <>
                 <div className="w-px h-5 bg-border-subtle" />
                 <div className="flex items-center bg-elevated rounded-lg p-0.5">
@@ -699,12 +745,16 @@ function DashboardContent({
             <KnowledgeGraphView />
           ) : viewMode === "domain" && domainGraph ? (
             <DomainGraphView />
+          ) : viewMode === "ops" && opGraph ? (
+            <OpGraphView />
           ) : (
             <GraphView />
           )}
-          <div className="absolute top-3 right-3 text-sm text-text-muted/60 pointer-events-none select-none">
-            {t.common.pressKeyboard}
-          </div>
+          {viewMode !== "ops" && (
+            <div className="absolute top-3 right-3 text-sm text-text-muted/60 pointer-events-none select-none">
+              {t.common.pressKeyboard}
+            </div>
+          )}
         </div>
 
         {/* Right sidebar — telescopes at narrower widths */}

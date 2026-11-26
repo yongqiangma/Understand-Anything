@@ -65,17 +65,25 @@ function normalizeGraphPath(filePath: string, projectRoot: string): string | nul
 
 function graphFilePathSet(graphFile: string, projectRoot: string): Set<string> {
   const allowed = new Set<string>();
-  try {
-    const raw = JSON.parse(fs.readFileSync(graphFile, "utf-8")) as {
-      nodes?: Array<Record<string, unknown>>;
-    };
-    for (const node of raw.nodes ?? []) {
-      if (typeof node.filePath !== "string") continue;
-      const normalized = normalizeGraphPath(node.filePath, projectRoot);
-      if (normalized) allowed.add(normalized);
+  // The op graph (/understand-ops) sits beside knowledge-graph.json and its
+  // op nodes point at model source files; allow those too so clicking an op
+  // opens its source. Each file is read independently: a broken op graph must
+  // not hide knowledge-graph paths.
+  const files = [graphFile, path.join(path.dirname(graphFile), "op-graph.json")];
+  for (const file of files) {
+    try {
+      if (file !== graphFile && !fs.existsSync(file)) continue;
+      const raw = JSON.parse(fs.readFileSync(file, "utf-8")) as {
+        nodes?: Array<Record<string, unknown>>;
+      };
+      for (const node of raw.nodes ?? []) {
+        if (typeof node.filePath !== "string") continue;
+        const normalized = normalizeGraphPath(node.filePath, projectRoot);
+        if (normalized) allowed.add(normalized);
+      }
+    } catch {
+      continue;
     }
-  } catch {
-    return allowed;
   }
   return allowed;
 }
@@ -295,6 +303,7 @@ export function createDataEndpointsMiddleware(
     const isProtectedEndpoint =
       pathname === "/knowledge-graph.json" ||
       pathname === "/domain-graph.json" ||
+      pathname === "/op-graph.json" ||
       pathname === "/diff-overlay.json" ||
       pathname === "/meta.json" ||
       pathname === "/config.json" ||
@@ -372,6 +381,8 @@ export function createDataEndpointsMiddleware(
         ? "meta.json"
         : pathname === "/domain-graph.json"
         ? "domain-graph.json"
+        : pathname === "/op-graph.json"
+        ? "op-graph.json"
         : "knowledge-graph.json";
 
     const candidates = graphFileCandidates(fileName);

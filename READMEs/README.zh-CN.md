@@ -162,6 +162,9 @@ Understand Anything 是一个 [Claude Code Plugin](https://code.claude.com/docs/
 # 提取业务领域知识（领域、流程、步骤）
 /understand-domain
 
+# 提取深度学习 OP 结构与 tensor 数据流(仪表盘 OPs 视图)
+/understand-ops
+
 # 分析 Karpathy 模式的 LLM Wiki 知识库
 /understand-knowledge ~/path/to/wiki
 
@@ -319,7 +322,7 @@ npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/un
 
 ### 多智能体架构
 
-`/understand` 命令调用 5 个 agent，`/understand-domain` 额外增加第 6 个，`/understand-knowledge` 再增加第 7 个：
+`/understand` 命令调用 5 个 agent，`/understand-domain` 额外增加第 6 个，`/understand-knowledge` 再增加第 7 个，`/understand-ops` 增加第 8 个：
 
 | Agent | 职责 |
 |-------|------|
@@ -330,6 +333,7 @@ npx https://github.com/Egonex-AI/Understand-Anything/releases/latest/download/un
 | `graph-reviewer` | 验证图的完整性和引用完整性（默认内联运行；使用 `--review` 进行完整的 LLM 审查） |
 | `domain-analyzer` | 提取业务领域、流程和处理步骤（由 `/understand-domain` 使用） |
 | `article-analyzer` | 从 wiki 文章中提取实体、论断和隐式关系（由 `/understand-knowledge` 使用） |
+| `op-analyzer` | 按阶段提取深度学习 OP（nn.Module / torch 函数），在数据流边上标注 tensor shape（由 `/understand-ops` 使用） |
 
 文件分析器并行运行（最多 5 个并发，每批 20–30 个文件）。支持增量更新 — 仅重新分析自上次运行以来发生更改的文件。
 

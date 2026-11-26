@@ -1,8 +1,9 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join, isAbsolute, relative, basename } from "node:path";
-import type { KnowledgeGraph, AnalysisMeta, ProjectConfig } from "../types.js";
+import type { KnowledgeGraph, AnalysisMeta, ProjectConfig, OpGraph } from "../types.js";
 import type { FingerprintStore } from "../fingerprint.js";
 import { validateGraph } from "../schema.js";
+import { validateOpGraph } from "../op-schema.js";
 
 const UA_DIR = ".ua";
 const LEGACY_UA_DIR = ".understand-anything";
@@ -50,10 +51,10 @@ function ensureDir(projectRoot: string): string {
  * This means the developer's home directory, username, and company
  * directory layout are never written to knowledge-graph.json.
  */
-function sanitiseFilePaths(
-  graph: KnowledgeGraph,
+function sanitiseFilePaths<T extends { nodes: Array<{ filePath?: string }> }>(
+  graph: T,
   projectRoot: string,
-): KnowledgeGraph {
+): T {
   const normalRoot = projectRoot.endsWith("/")
     ? projectRoot
     : projectRoot + "/";
@@ -194,4 +195,49 @@ export function loadDomainGraph(
   }
 
   return data as KnowledgeGraph;
+}
+
+const OP_GRAPH_FILE = "op-graph.json";
+
+/**
+ * Persist the deep-learning op graph produced by `/understand-ops`.
+ * Absolute file paths (node.filePath, stage.sourceFiles) are made
+ * project-relative, same as saveGraph.
+ */
+export function saveOpGraph(projectRoot: string, graph: OpGraph): void {
+  const dir = ensureDir(projectRoot);
+  const sanitised = sanitiseFilePaths(graph, projectRoot);
+  const stages = sanitised.stages.map((stage) => {
+    if (!stage.sourceFiles) return stage;
+    const sourceFiles = sanitiseFilePaths(
+      { nodes: stage.sourceFiles.map((filePath) => ({ filePath })) },
+      projectRoot,
+    ).nodes.map((n) => n.filePath as string);
+    return { ...stage, sourceFiles };
+  });
+  writeFileSync(
+    join(dir, OP_GRAPH_FILE),
+    JSON.stringify({ ...sanitised, stages }, null, 2),
+    "utf-8",
+  );
+}
+
+export function loadOpGraph(
+  projectRoot: string,
+  options?: { validate?: boolean },
+): OpGraph | null {
+  const filePath = join(resolveUaDir(projectRoot), OP_GRAPH_FILE);
+  if (!existsSync(filePath)) return null;
+
+  const data = JSON.parse(readFileSync(filePath, "utf-8"));
+
+  if (options?.validate !== false) {
+    const result = validateOpGraph(data);
+    if (!result.success || !result.data) {
+      throw new Error(`Invalid op graph: ${result.fatal ?? "unknown error"}`);
+    }
+    return result.data;
+  }
+
+  return data as OpGraph;
 }

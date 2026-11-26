@@ -116,15 +116,22 @@ function normalizeGraphPath(filePath) {
 
 function graphFilePathSet() {
   const allowed = new Set();
-  try {
-    const raw = JSON.parse(fs.readFileSync(path.join(graphDir, "knowledge-graph.json"), "utf-8"));
-    for (const node of raw.nodes ?? []) {
-      if (typeof node.filePath !== "string") continue;
-      const normalized = normalizeGraphPath(node.filePath);
-      if (normalized) allowed.add(normalized);
+  // Op nodes from op-graph.json (/understand-ops) also point at source files.
+  // Read each graph independently so a broken op graph never hides
+  // knowledge-graph paths.
+  for (const fileName of ["knowledge-graph.json", "op-graph.json"]) {
+    const file = path.join(graphDir, fileName);
+    try {
+      if (fileName !== "knowledge-graph.json" && !fs.existsSync(file)) continue;
+      const raw = JSON.parse(fs.readFileSync(file, "utf-8"));
+      for (const node of raw.nodes ?? []) {
+        if (typeof node.filePath !== "string") continue;
+        const normalized = normalizeGraphPath(node.filePath);
+        if (normalized) allowed.add(normalized);
+      }
+    } catch {
+      continue;
     }
-  } catch {
-    return allowed;
   }
   return allowed;
 }
@@ -309,6 +316,7 @@ function serveStatic(res, pathname) {
 const PROTECTED = new Set([
   "/knowledge-graph.json",
   "/domain-graph.json",
+  "/op-graph.json",
   "/diff-overlay.json",
   "/meta.json",
   "/config.json",

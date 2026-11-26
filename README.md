@@ -166,6 +166,9 @@ An interactive web dashboard opens with your codebase visualized as a graph — 
 # Extract business domain knowledge (domains, flows, steps)
 /understand-domain
 
+# Extract deep-learning op structure and tensor data flow (OP view in the dashboard)
+/understand-ops
+
 # Analyze a Karpathy-pattern LLM wiki knowledge base
 /understand-knowledge ~/path/to/wiki
 
@@ -365,7 +368,7 @@ This split is why the graph is reproducible on the structural side (the same cod
 
 ### Multi-Agent Pipeline
 
-The `/understand` command orchestrates 5 specialized agents, `/understand-domain` adds a 6th, and `/understand-knowledge` adds a 7th:
+The `/understand` command orchestrates 5 specialized agents, `/understand-domain` adds a 6th, `/understand-knowledge` adds a 7th, and `/understand-ops` adds an 8th:
 
 | Agent                   | Role                                                                                                               | Used By                 |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------- |
@@ -376,6 +379,7 @@ The `/understand` command orchestrates 5 specialized agents, `/understand-domain
 | `graph-reviewer`        | Validates graph completeness and referential integrity. Runs inline by default; use `--review` for full LLM review | `/understand`           |
 | `domain-analyzer`       | Extracts business domains, flows, and process steps                                                                | `/understand-domain`    |
 | `article-analyzer`      | Extracts entities, claims, and implicit relationships from wiki articles                                           | `/understand-knowledge` |
+| `op-analyzer`           | Extracts deep-learning ops (nn.Module / torch functions) by stage, with tensor shapes on data-flow edges           | `/understand-ops`       |
 
 File analyzers run in parallel, up to 5 concurrent workers and 20–30 files per batch.
 

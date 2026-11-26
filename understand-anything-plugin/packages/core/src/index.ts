@@ -10,6 +10,12 @@ export {
   type ValidationResult,
   type GraphIssue,
 } from "./schema.js";
+export {
+  validateOpGraph,
+  OP_NODE_KIND_ALIASES,
+  OP_EDGE_FLOW_ALIASES,
+  type OpGraphValidationResult,
+} from "./op-schema.js";
 export { TreeSitterPlugin } from "./plugins/tree-sitter-plugin.js";
 export type { LanguageExtractor } from "./plugins/extractors/types.js";
 export { builtinExtractors } from "./plugins/extractors/index.js";

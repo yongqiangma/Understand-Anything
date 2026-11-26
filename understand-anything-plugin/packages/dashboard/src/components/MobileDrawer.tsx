@@ -40,6 +40,7 @@ export default function MobileDrawer({
   const graph = useDashboardStore((s) => s.graph);
   const isKnowledgeGraph = useDashboardStore((s) => s.isKnowledgeGraph);
   const domainGraph = useDashboardStore((s) => s.domainGraph);
+  const opGraph = useDashboardStore((s) => s.opGraph);
   const viewMode = useDashboardStore((s) => s.viewMode);
   const setViewMode = useDashboardStore((s) => s.setViewMode);
   const nodeTypeFilters = useDashboardStore((s) => s.nodeTypeFilters);
@@ -80,7 +81,7 @@ export default function MobileDrawer({
   }, [open]);
 
   const filterDefs = isKnowledgeGraph ? knowledgeFilters : structuralFilters;
-  const showViewToggle = Boolean(graph && !isKnowledgeGraph && domainGraph);
+  const showViewToggle = Boolean(graph && !isKnowledgeGraph && (domainGraph || opGraph));
 
   return (
     <div
@@ -144,6 +145,7 @@ export default function MobileDrawer({
             <section>
               <SectionLabel>{t.drawer.view}</SectionLabel>
               <div className="inline-flex items-center bg-elevated rounded-lg p-0.5">
+                {domainGraph && (
                 <button
                   type="button"
                   onClick={() => setViewMode("domain")}
@@ -155,6 +157,20 @@ export default function MobileDrawer({
                 >
                   {t.drawer.domain}
                 </button>
+                )}
+                {opGraph && (
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("ops")}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      viewMode === "ops"
+                        ? "bg-accent/20 text-accent"
+                        : "text-text-muted hover:text-text-secondary"
+                    }`}
+                  >
+                    {t.drawer.ops}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setViewMode("structural")}

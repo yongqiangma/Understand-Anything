@@ -13,10 +13,35 @@ export interface ElkChild {
   parentId?: string;
 }
 
+export interface ElkPoint {
+  x: number;
+  y: number;
+}
+
+export interface ElkEdgeSection {
+  id?: string;
+  startPoint: ElkPoint;
+  endPoint: ElkPoint;
+  bendPoints?: ElkPoint[];
+}
+
+export interface ElkLabel {
+  text?: string;
+  width: number;
+  height: number;
+  /** Set by ELK after layout, relative to the edge's container. */
+  x?: number;
+  y?: number;
+}
+
 export interface ElkEdge {
   id: string;
   sources: string[];
   targets: string[];
+  labels?: ElkLabel[];
+  /** Set by ELK after layout. Coordinates are relative to `container`. */
+  container?: string;
+  sections?: ElkEdgeSection[];
 }
 
 export interface ElkInput {

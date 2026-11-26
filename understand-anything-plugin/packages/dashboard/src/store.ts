@@ -5,6 +5,7 @@ import type { GraphIssue } from "@understand-anything/core/schema";
 import type {
   GraphNode,
   KnowledgeGraph,
+  OpGraph,
   TourStep,
 } from "@understand-anything/core/types";
 import type { ReactFlowInstance } from "@xyflow/react";
@@ -14,7 +15,7 @@ export type NavigationLevel = "overview" | "layer-detail";
 export type NodeType = "file" | "function" | "class" | "module" | "concept" | "config" | "document" | "service" | "table" | "endpoint" | "pipeline" | "schema" | "resource" | "domain" | "flow" | "step" | "article" | "entity" | "topic" | "claim" | "source" | "page" | "screen" | "component" | "componentSet" | "instance" | "token";
 export type Complexity = "simple" | "moderate" | "complex";
 export type EdgeCategory = "structural" | "behavioral" | "data-flow" | "dependencies" | "semantic" | "infrastructure" | "domain" | "knowledge" | "design";
-export type ViewMode = "structural" | "domain" | "knowledge";
+export type ViewMode = "structural" | "domain" | "knowledge" | "ops";
 export type DetailLevel = "file" | "class";
 
 export interface FilterState {
@@ -194,8 +195,17 @@ interface DashboardStore {
   isKnowledgeGraph: boolean;
   domainGraph: KnowledgeGraph | null;
   activeDomainId: string | null;
+  /** Deep-learning op graph from /understand-ops (op-graph.json). */
+  opGraph: OpGraph | null;
+  /** Op node selected in the OP view (separate from selectedNodeId, which indexes the structural graph). */
+  selectedOpNodeId: string | null;
 
   setDomainGraph: (graph: KnowledgeGraph) => void;
+  /** Shape labels on OP-view edges: symbolic ("[B, L, H]") or config values ("[1, 4096, 2560]"). */
+  opShapeMode: "symbolic" | "numeric";
+  setOpGraph: (graph: OpGraph) => void;
+  selectOpNode: (nodeId: string | null) => void;
+  setOpShapeMode: (mode: "symbolic" | "numeric") => void;
   setViewMode: (mode: ViewMode) => void;
   setIsKnowledgeGraph: (value: boolean) => void;
   navigateToDomain: (domainId: string) => void;
@@ -367,9 +377,11 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     const searchEngine = new SearchEngine(graph.nodes);
     const query = get().searchQuery;
     const searchResults = query.trim() ? searchEngine.search(query) : [];
-    const { viewMode, domainGraph, activeDomainId } = get();
+    const { viewMode, domainGraph, activeDomainId, opGraph } = get();
     // Preserve domain view if a domain graph is already loaded
     const keepDomainView = viewMode === "domain" && domainGraph !== null;
+    // Likewise keep the OP view when an op graph is loaded
+    const keepOpsView = viewMode === "ops" && opGraph !== null;
     const { nodesById, nodeIdToLayerId, nodeIdToLayerIds } = buildGraphIndexes(graph);
     set({
       graph,
@@ -383,7 +395,11 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
       selectedNodeId: null,
       focusNodeId: null,
       nodeHistory: [],
-      viewMode: keepDomainView ? "domain" as const : "structural" as const,
+      viewMode: keepDomainView
+        ? "domain" as const
+        : keepOpsView
+        ? "ops" as const
+        : "structural" as const,
       activeDomainId: keepDomainView ? activeDomainId : null,
       containerLayoutCache: new Map(),
       expandedContainers: new Set(),
@@ -686,9 +702,24 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
   isKnowledgeGraph: false,
   domainGraph: null,
   activeDomainId: null,
+  opGraph: null,
+  selectedOpNodeId: null,
+  opShapeMode: "symbolic",
 
   setDomainGraph: (graph) => {
     set({ domainGraph: graph });
+  },
+
+  setOpGraph: (graph) => {
+    set({ opGraph: graph, selectedOpNodeId: null });
+  },
+
+  selectOpNode: (nodeId) => {
+    set({ selectedOpNodeId: nodeId });
+  },
+
+  setOpShapeMode: (mode) => {
+    set({ opShapeMode: mode });
   },
 
   setIsKnowledgeGraph: (value) => {
@@ -699,6 +730,7 @@ export const useDashboardStore = create<DashboardStore>()((set, get) => ({
     set({
       viewMode: mode,
       selectedNodeId: null,
+      selectedOpNodeId: null,
       focusNodeId: null,
       codeViewerOpen: false,
       codeViewerNodeId: null,

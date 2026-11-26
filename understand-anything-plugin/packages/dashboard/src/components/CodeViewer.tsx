@@ -194,10 +194,18 @@ export default function CodeViewer({
   const viewMode = useDashboardStore((s) => s.viewMode);
   const codeViewerNodeId = useDashboardStore((s) => s.codeViewerNodeId);
   const closeCodeViewer = useDashboardStore((s) => s.closeCodeViewer);
+  const opGraph = useDashboardStore((s) => s.opGraph);
   const activeGraph = viewMode === "domain" && domainGraph ? domainGraph : graph;
+  // The code viewer only needs name / filePath / lineRange, which op nodes
+  // (OP view) share with graph nodes.
+  const opNode =
+    viewMode === "ops" && opGraph
+      ? opGraph.nodes.find((n) => n.id === codeViewerNodeId) ?? null
+      : null;
   // Files tab always builds its tree from the structural graph, so a node ID opened from
   // there may not exist in the active (domain) graph — fall back to the structural graph.
-  const node =
+  const node: { name: string; filePath?: string; lineRange?: [number, number] } | null =
+    opNode ??
     activeGraph?.nodes.find((n) => n.id === codeViewerNodeId) ??
     graph?.nodes.find((n) => n.id === codeViewerNodeId) ??
     null;

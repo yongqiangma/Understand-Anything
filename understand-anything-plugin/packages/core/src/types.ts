@@ -137,6 +137,98 @@ export interface KnowledgeGraph {
   tour: TourStep[];
 }
 
+// ── Op graph (deep-learning operator-level dataflow, produced by /understand-ops) ──
+// Lives in its own file (`op-graph.json`) next to the knowledge graph. It is a
+// separate document type rather than extra KnowledgeGraph node types because
+// op nodes carry tensor shapes on edges and are grouped into stages/sub-blocks.
+
+/** Visual/semantic role of an op node. */
+export type OpNodeKind =
+  | "param"         // op with trainable parameters (nn.Linear, RMSNorm, Embedding ...)
+  | "frozen"        // op whose weights are frozen / copied from another model
+  | "fn"            // parameter-free tensor op (view, transpose, cat, softmax, mask_mod ...)
+  | "tensor"        // named input tensor or a reference to a tensor produced in another stage
+  | "output"        // key intermediate result / stage output
+  | "target"        // computation on the "other" model side (teacher / target / reference model)
+  | "target_output" // key result on the target-model side
+  | "add"           // residual add / elementwise merge
+  | "loss"          // loss term or final objective
+  | "decision";     // control-flow branch / loop condition
+
+/** What flows along an op edge; drives edge colour. */
+export type OpEdgeFlow = "data" | "target" | "index" | "control";
+
+export interface OpSymbol {
+  name: string;          // e.g. "H"
+  description: string;   // e.g. "hidden_size"
+  value?: string;        // e.g. "2560" (from the analysed config)
+}
+
+export interface OpGroup {
+  id: string;
+  title: string;
+  subtitle?: string;
+  /** default = plain sub-block, repeat = unrolled once but executed N times,
+   * loop = runtime loop body, target = runs on the target-model side */
+  kind?: "default" | "repeat" | "loop" | "target";
+  repeat?: number;
+  parentId?: string;
+}
+
+export interface OpStage {
+  id: string;
+  order: number;
+  title: string;
+  summary: string;
+  phase?: "train" | "infer" | "both";
+  sourceFiles?: string[];
+  groups?: OpGroup[];
+}
+
+export interface OpNode {
+  id: string;
+  stageId: string;
+  groupId?: string;
+  name: string;            // short label, e.g. "q_proj"
+  op?: string;             // op signature, e.g. "Linear(H→Hq·D)"
+  kind: OpNodeKind;
+  module?: string;         // owning nn.Module / function, e.g. "Qwen3DSparkAttention"
+  summary?: string;
+  notes?: string[];        // extra one-line annotations shown under the node
+  filePath?: string;
+  lineRange?: [number, number];
+  /** For kind=tensor nodes that stand in for a tensor produced elsewhere. */
+  refNodeId?: string;
+}
+
+export interface OpEdge {
+  source: string;
+  target: string;
+  flow: OpEdgeFlow;
+  shape?: string;          // symbolic shape, e.g. "[B, Q, H]"
+  shapeValue?: string;     // concrete shape under the analysed config, e.g. "[1, 3584, 2560]"
+  label?: string;          // extra label, e.g. "residual"
+  dashed?: boolean;
+}
+
+export interface OpModelMeta {
+  name: string;
+  framework?: string;      // e.g. "pytorch"
+  configSource?: string;   // e.g. "config/dspark/dspark_qwen3_4b.py"
+  description?: string;
+}
+
+export interface OpGraph {
+  version: string;
+  kind: "ops";
+  project: ProjectMeta;
+  model: OpModelMeta;
+  symbols: OpSymbol[];
+  stages: OpStage[];
+  nodes: OpNode[];
+  edges: OpEdge[];
+}
+
 // Theme configuration (for dashboard customization)
 export interface ThemeConfig {
   presetId: string;

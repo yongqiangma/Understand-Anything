@@ -725,3 +725,7 @@ export function validateGraph(data: unknown): ValidationResult {
 
   return { success: true, data: graph, issues, errors: buildErrors(issues) };
 }
+
+// Op graph (deep-learning op view) validation, re-exported so the dashboard
+// can use it via the browser-safe "@understand-anything/core/schema" subpath.
+export * from "./op-schema.js";

@@ -4,6 +4,8 @@ import { useDashboardStore } from "../store";
 import { useI18n } from "../contexts/I18nContext";
 import GraphView from "./GraphView";
 import DomainGraphView from "./DomainGraphView";
+import OpGraphView from "./OpGraphView";
+import OpNodeInfo from "./OpNodeInfo";
 import KnowledgeGraphView from "./KnowledgeGraphView";
 import SearchBar from "./SearchBar";
 import NodeInfo from "./NodeInfo";
@@ -46,6 +48,8 @@ export default function MobileLayout({
   const persona = useDashboardStore((s) => s.persona);
   const viewMode = useDashboardStore((s) => s.viewMode);
   const domainGraph = useDashboardStore((s) => s.domainGraph);
+  const opGraph = useDashboardStore((s) => s.opGraph);
+  const selectedOpNodeId = useDashboardStore((s) => s.selectedOpNodeId);
   const codeViewerOpen = useDashboardStore((s) => s.codeViewerOpen);
   const closeCodeViewer = useDashboardStore((s) => s.closeCodeViewer);
   const pathFinderOpen = useDashboardStore((s) => s.pathFinderOpen);
@@ -59,8 +63,8 @@ export default function MobileLayout({
   // Auto-pivot to Info when a node is selected — keeps feedback visible
   // on a small screen where graph and sidebar can't coexist
   useEffect(() => {
-    if (selectedNodeId) setActiveTab("info");
-  }, [selectedNodeId]);
+    if (selectedNodeId || selectedOpNodeId) setActiveTab("info");
+  }, [selectedNodeId, selectedOpNodeId]);
 
   // When a code viewer opens (e.g. from the Files tab) keep focus there
   useEffect(() => {
@@ -68,7 +72,9 @@ export default function MobileLayout({
   }, [codeViewerOpen]);
 
   const isLearnMode = tourActive || persona === "junior";
-  const infoContent = (
+  const infoContent = viewMode === "ops" && opGraph ? (
+    <OpNodeInfo />
+  ) : (
     <>
       {selectedNodeId && <NodeInfo />}
       {isLearnMode && (
@@ -163,6 +169,8 @@ export default function MobileLayout({
             <KnowledgeGraphView />
           ) : viewMode === "domain" && domainGraph ? (
             <DomainGraphView />
+          ) : viewMode === "ops" && opGraph ? (
+            <OpGraphView />
           ) : (
             <GraphView />
           )}
